@@ -711,7 +711,8 @@
                     '<span class="badge-tag badge-no">❌</span>';
                 const againBadge = t.wouldTakeAgain === 'yes' ?
                     '<span class="badge-tag badge-green">✅ Yes</span>' :
-                    '<span class="badge-tag badge-red">❌ No</span>';
+                    t.wouldTakeAgain === 'no' ? '<span class="badge-tag badge-red">❌ No</span>' :
+                    '<span class="badge-tag badge-neutral">—</span>';
                 const qStars = '⭐'.repeat(Math.min(t.entryQuality || 3, 5));
                 const convStars = '⭐'.repeat(Math.min(t.conviction || 3, 5));
 
@@ -890,7 +891,7 @@
                 Execution: t.execution || '—',
                 'Exit Reason': t.exitReason || '—',
                 Mistake: t.mistakeType || '—',
-                'Would Take Again': t.wouldTakeAgain === 'yes' ? '✅ Yes' : '❌ No',
+                'Would Take Again': t.wouldTakeAgain === 'yes' ? '✅ Yes' : t.wouldTakeAgain === 'no' ? '❌ No' : '—',
                 Emotion: t.emotion || '—',
                 Notes: t.notes || ''
             }));
@@ -902,21 +903,23 @@
         }
 
         // ============================================================
-        //  PERSISTENCE
+        //  PERSISTENCE - FIXED: Uses same key as old journal
         // ============================================================
         function saveToLocal() {
-            localStorage.setItem('bajaj_pro_trades', JSON.stringify(trades));
-            localStorage.setItem('bajaj_pro_capital', capital);
+            localStorage.setItem('bajaj_trades_final', JSON.stringify(trades));
+            localStorage.setItem('bajaj_capital_final', capital);
         }
 
         function loadFromLocal() {
-            const stored = localStorage.getItem('bajaj_pro_trades');
+            // Try to load from the original key
+            const stored = localStorage.getItem('bajaj_trades_final');
             if (stored) {
                 try {
                     const parsed = JSON.parse(stored);
+                    // Migrate old trades to new format - PRESERVES ALL OLD DATA
                     trades = parsed.map(t => ({
-                        ...t,
-                        // ensure all new fields exist for old trades
+                        ...t, // Keep ALL existing data
+                        // Add new fields with defaults (null for old trades)
                         stock: t.stock || 'BAJFINANCE',
                         setupType: t.setupType || null,
                         rsi: t.rsi || null,
@@ -930,9 +933,17 @@
                         mistakeType: t.mistakeType || null,
                         wouldTakeAgain: t.wouldTakeAgain || null
                     }));
-                } catch (e) { trades = []; }
+                    console.log(`✅ Loaded ${trades.length} trades from localStorage`);
+                } catch (e) {
+                    console.error('Error loading trades:', e);
+                    trades = [];
+                }
+            } else {
+                console.log('No existing trades found. Starting fresh.');
+                trades = [];
             }
-            const cap = localStorage.getItem('bajaj_pro_capital');
+
+            const cap = localStorage.getItem('bajaj_capital_final');
             if (cap) { capital = parseFloat(cap); if (isNaN(capital)) capital = 500000; }
             document.getElementById('capitalInput').value = capital;
 
@@ -963,15 +974,18 @@
                 alert('Capital updated.'); } else { alert('Invalid capital.'); }
         });
 
+        // Load data FIRST, then init everything else
         loadFromLocal();
         initDarkMode();
         fullRefresh();
 
-        // ---- enter key support ----
+        // Enter key support
         document.getElementById('tradeForm').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') { e.preventDefault();
                 addTrade(); }
         });
+
+        console.log('✅ Journal ready! Your data is safe.');
     </script>
 </body>
 </html>
